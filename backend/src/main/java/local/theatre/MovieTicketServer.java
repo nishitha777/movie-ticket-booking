@@ -13,7 +13,7 @@ import java.util.Map;
 public class MovieTicketServer {
     private static final String URL = System.getenv().getOrDefault(
             "DB_URL", "jdbc:mysql://localhost:3307/movie_ticket_booking");
-    private static final String USER = System.getenv().getOrDefault("DB_USER", "restaurant");
+    private static final String USER = System.getenv().getOrDefault("DB_USER", "theatre");
     private static final String PASSWORD = System.getenv().getOrDefault("DB_PASSWORD", "");
 
     public static void main(String[] args) throws Exception {
