@@ -4,6 +4,7 @@
     "**/tools/**": true,
     "**/work/**": true,
     "**/target/**": true,
+    "**/backend/out/**": true,
     "**/*.db": true,
     "**/__pycache__/**": true,
     "**/*.pyc": true
@@ -13,6 +14,7 @@
     "**/tools/**": true,
     "**/work/**": true,
     "**/target/**": true,
+    "**/backend/out/**": true,
     "**/*.db": true,
     "**/__pycache__/**": true,
     "**/*.pyc": true

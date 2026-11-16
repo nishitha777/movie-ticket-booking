@@ -1,9 +1,5 @@
 package local.basilbyte;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -13,12 +9,15 @@ import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Small JDBC backend for the Tkinter movie ticket screen. */
 public class MovieTicketServer {
-    private static final ObjectMapper json = new ObjectMapper();
     private static final String url = System.getenv().getOrDefault(
             "DB_URL", "jdbc:mysql://localhost:3307/movie_ticket_booking?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC");
     private static final String user = System.getenv().getOrDefault("DB_USER", "restaurant");
@@ -63,14 +62,14 @@ public class MovieTicketServer {
         try (Connection db = connect();
              PreparedStatement sql = db.prepareStatement("SELECT id, name, price FROM movies ORDER BY id");
              ResultSet rows = sql.executeQuery()) {
-            ArrayNode movies = json.createArrayNode();
+            StringBuilder movies = new StringBuilder("[");
             while (rows.next()) {
-                ObjectNode movie = movies.addObject();
-                movie.put("id", rows.getInt("id"));
-                movie.put("name", rows.getString("name"));
-                movie.put("price", rows.getBigDecimal("price"));
+                if (movies.length() > 1) movies.append(',');
+                movies.append("{\"id\":").append(rows.getInt("id"))
+                        .append(",\"name\":").append(jsonString(rows.getString("name")))
+                        .append(",\"price\":").append(rows.getBigDecimal("price")).append('}');
             }
-            send(request, 200, movies);
+            send(request, 200, movies.append(']').toString());
         } catch (SQLException error) {
             sendError(request, error);
         }
@@ -78,14 +77,17 @@ public class MovieTicketServer {
 
     private static void showSeats(HttpExchange request) throws IOException {
         Map<String, String> query = readQuery(request);
-        ArrayNode seats = json.createArrayNode();
+        StringBuilder seats = new StringBuilder("[");
         String sqlText = "SELECT seat FROM bookings WHERE movie_id=? AND show_time=?";
         try (Connection db = connect(); PreparedStatement sql = db.prepareStatement(sqlText)) {
             sql.setInt(1, Integer.parseInt(query.getOrDefault("movieId", "0")));
             sql.setString(2, query.getOrDefault("showTime", ""));
             ResultSet rows = sql.executeQuery();
-            while (rows.next()) seats.add(rows.getString("seat"));
-            send(request, 200, seats);
+            while (rows.next()) {
+                if (seats.length() > 1) seats.append(',');
+                seats.append(jsonString(rows.getString("seat")));
+            }
+            send(request, 200, seats.append(']').toString());
         } catch (Exception error) {
             sendError(request, error);
         }
@@ -93,12 +95,12 @@ public class MovieTicketServer {
 
     private static void bookSeats(HttpExchange request) throws IOException {
         try {
-            JsonNode data = json.readTree(request.getRequestBody());
-            String name = data.path("customerName").asText().trim();
-            String show = data.path("showTime").asText();
-            int movieId = data.path("movieId").asInt();
-            JsonNode seats = data.path("seats");
-            if (name.isEmpty() || show.isEmpty() || movieId < 1 || !seats.isArray() || seats.isEmpty()) {
+            String data = new String(request.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            String name = jsonValue(data, "customerName").trim();
+            String show = jsonValue(data, "showTime");
+            int movieId = Integer.parseInt(numberValue(data, "movieId"));
+            List<String> seats = seatValues(data);
+            if (name.isEmpty() || show.isEmpty() || movieId < 1 || seats.isEmpty()) {
                 send(request, 400, error("Enter your name and select at least one seat."));
                 return;
             }
@@ -116,8 +118,7 @@ public class MovieTicketServer {
                 String addBooking = "INSERT INTO bookings(customer_name, movie_id, show_time, seat, price) " +
                         "VALUES (?, ?, ?, ?, ?)";
                 try (PreparedStatement booking = db.prepareStatement(addBooking)) {
-                    for (JsonNode seat : seats) {
-                        String seatName = seat.asText();
+                    for (String seatName : seats) {
                         if (!seatName.matches("[A-F][1-8]")) throw new IllegalArgumentException("Invalid seat.");
                         booking.setString(1, name);
                         booking.setInt(2, movieId);
@@ -130,9 +131,8 @@ public class MovieTicketServer {
                 }
                 db.commit();
 
-                ObjectNode result = json.createObjectNode();
-                result.put("bookingId", "saved");
-                result.put("total", price.multiply(BigDecimal.valueOf(seats.size())));
+                String result = "{\"bookingId\":\"saved\",\"total\":"
+                        + price.multiply(BigDecimal.valueOf(seats.size())) + "}";
                 send(request, 201, result);
             }
         } catch (IllegalArgumentException error) {
@@ -155,21 +155,61 @@ public class MovieTicketServer {
         return values;
     }
 
-    private static ObjectNode error(String message) {
-        ObjectNode result = json.createObjectNode();
-        result.put("error", message);
-        return result;
+    private static String error(String message) {
+        return "{\"error\":" + jsonString(message) + "}";
     }
 
     private static void sendError(HttpExchange request, Exception error) throws IOException {
         send(request, 500, error(error.getMessage()));
     }
 
-    private static void send(HttpExchange request, int status, JsonNode data) throws IOException {
-        byte[] body = json.writeValueAsBytes(data);
+    private static void send(HttpExchange request, int status, String data) throws IOException {
+        byte[] body = data.getBytes(StandardCharsets.UTF_8);
         request.getResponseHeaders().set("Content-Type", "application/json");
         request.sendResponseHeaders(status, body.length);
         request.getResponseBody().write(body);
         request.close();
+    }
+
+    private static String jsonString(String value) {
+        StringBuilder result = new StringBuilder("\"");
+        for (char character : value.toCharArray()) {
+            switch (character) {
+                case '"' -> result.append("\\\"");
+                case '\\' -> result.append("\\\\");
+                case '\n' -> result.append("\\n");
+                case '\r' -> result.append("\\r");
+                case '\t' -> result.append("\\t");
+                default -> {
+                    if (character < 32) result.append(String.format("\\u%04x", (int) character));
+                    else result.append(character);
+                }
+            }
+        }
+        return result.append('"').toString();
+    }
+
+    private static String jsonValue(String json, String key) {
+        Matcher match = Pattern.compile("\\\"" + Pattern.quote(key)
+                + "\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"\\\\])*)\\\"").matcher(json);
+        if (!match.find()) return "";
+        String value = match.group(1);
+        return value.replace("\\\"", "\"").replace("\\\\", "\\")
+                .replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t");
+    }
+
+    private static String numberValue(String json, String key) {
+        Matcher match = Pattern.compile("\\\"" + Pattern.quote(key) + "\\\"\\s*:\\s*(\\d+)").matcher(json);
+        if (!match.find()) return "0";
+        return match.group(1);
+    }
+
+    private static List<String> seatValues(String json) {
+        List<String> seats = new ArrayList<>();
+        Matcher array = Pattern.compile("\\\"seats\\\"\\s*:\\s*\\[([^]]*)\\]").matcher(json);
+        if (!array.find()) return seats;
+        Matcher seat = Pattern.compile("\\\"((?:\\\\.|[^\\\"\\\\])*)\\\"").matcher(array.group(1));
+        while (seat.find()) seats.add(seat.group(1));
+        return seats;
     }
 }
