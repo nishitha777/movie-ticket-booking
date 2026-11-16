@@ -1,6 +1,5 @@
 """Tkinter screen for the movie booking JDBC/MySQL project."""
 
-import json
 import tkinter as tk
 from tkinter import messagebox, ttk
 from urllib.parse import urlencode
@@ -13,16 +12,17 @@ ROWS = "ABCDEF"
 
 
 def api(path, data=None):
-    body = json.dumps(data).encode() if data is not None else None
-    request = Request(API + path, data=body, headers={"Content-Type": "application/json"})
+    body = urlencode(data).encode() if data is not None else None
+    request = Request(API + path, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"})
     with urlopen(request, timeout=3) as response:
-        return json.loads(response.read().decode())
+        return response.read().decode()
 
 
 def get_booked_seats():
     movie_id = MOVIES[movie_choice.get()][0]
     query = urlencode({"movieId": movie_id, "showTime": time_choice.get()})
-    return api("/seats?" + query)
+    booked = api("/seats?" + query)
+    return booked.split(",") if booked else []
 
 
 def update_summary():
@@ -60,8 +60,8 @@ def book_tickets():
     movie_id, price = MOVIES[movie_choice.get()]
     seats = sorted(selected_seats)
     try:
-        api("/bookings", {"customerName": name, "movieId": movie_id,
-                           "showTime": time_choice.get(), "seats": seats})
+        api("/bookings", {"name": name, "movieId": movie_id,
+                           "showTime": time_choice.get(), "seats": ",".join(seats)})
     except Exception:
         messagebox.showerror("Booking", "Booking failed. Check MySQL and make sure the seats are free.")
         draw_seats()
