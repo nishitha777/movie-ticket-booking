@@ -1,0 +1,13 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+*.db
+
+# Java/Maven build output
+backend/target/
+
+# Local MySQL files and temporary work
+mysql-data/
+work/
+tools/
+*.log

@@ -1,0 +1,20 @@
+{
+  "files.exclude": {
+    "**/mysql-data/**": true,
+    "**/tools/**": true,
+    "**/work/**": true,
+    "**/target/**": true,
+    "**/*.db": true,
+    "**/__pycache__/**": true,
+    "**/*.pyc": true
+  },
+  "search.exclude": {
+    "**/mysql-data/**": true,
+    "**/tools/**": true,
+    "**/work/**": true,
+    "**/target/**": true,
+    "**/*.db": true,
+    "**/__pycache__/**": true,
+    "**/*.pyc": true
+  }
+}
