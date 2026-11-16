@@ -1,4 +1,4 @@
-package local.basilbyte;
+package local.theatre;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;

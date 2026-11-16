@@ -9,8 +9,8 @@ Tkinter GUI with a Java JDBC backend and MySQL database.
    $env:DB_USER = "restaurant"
    $env:DB_PASSWORD = "your MySQL password"
    cd backend
-   javac -cp "lib\mysql-connector-j-9.5.0.jar" -d out src\main\java\local\basilbyte\MovieTicketServer.java
-   java -cp "out;lib\mysql-connector-j-9.5.0.jar" local.basilbyte.MovieTicketServer
+   javac -cp "lib\mysql-connector-j-9.5.0.jar" -d out src\main\java\local\theatre\MovieTicketServer.java
+   java -cp "out;lib\mysql-connector-j-9.5.0.jar" local.theatre.MovieTicketServer
    ```
 
 3. In another terminal from the project folder, run `python movie_booking.py`.
