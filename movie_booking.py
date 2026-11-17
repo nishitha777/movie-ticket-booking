@@ -111,6 +111,10 @@ tk.Button(form, text="BOOK TICKETS", command=book_tickets).pack(fill="x", pady=4
 
 seat_area = tk.Frame(main, bg="#191a29")
 seat_area.pack(side="left", fill="both", expand=True)
+screen = tk.Canvas(seat_area, width=420, height=50, bg="#191a29", highlightthickness=0)
+screen.pack(pady=(8, 0))
+screen.create_arc(25, 5, 395, 85, start=20, extent=140,
+                  style=tk.ARC, outline="#f3bd18", width=4)
 tk.Label(seat_area, text="SCREEN THIS WAY", bg="#191a29", fg="#f3bd18").pack(pady=8)
 selected_seats = set()
 seat_buttons = {}
